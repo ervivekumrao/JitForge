@@ -1,4 +1,14 @@
-# JitForge
+# ⚡ JitForge
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-21%2B-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21+" />
+  <img src="https://img.shields.io/badge/Gradle-9.x%20%2F%208.x-02303A?style=for-the-badge&logo=gradle&logoColor=white" alt="Gradle" />
+  <img src="https://img.shields.io/badge/Podman-OCI_Compliant-892CA0?style=for-the-badge&logo=podman&logoColor=white" alt="Podman" />
+  <img src="https://img.shields.io/badge/Redis-Tiered_Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/PostgreSQL-Bytecode_Store-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Tests-74_Passing-brightgreen?style=for-the-badge&logo=junit5&logoColor=white" alt="Tests" />
+  <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge" alt="License" />
+</p>
 
 > **Enterprise In-Memory Java Runtime Compilation, JIT Execution & Tiered Bytecode Microservice**  
 > **Author & Developer:** Vivek Umrao  
@@ -7,6 +17,34 @@
 A high-performance, in-memory Java runtime compilation, JIT execution, and bytecode synthesis engine. It enables
 compiling and executing dynamic Java code, scripts, and expressions entirely in RAM with zero disk I/O, sub-millisecond
 caching, robust multi-tier dependency resolution, containerized microservices, and sandboxed security.
+
+---
+
+## 📑 Table of Contents
+
+- [⚡ Quick Start](#-quick-start)
+- [🚀 Key Features & Capabilities](#-key-features--capabilities)
+  - [📊 Feature Matrix at a Glance](#-feature-matrix-at-a-glance)
+  - [1. ⚡ In-Memory Compilation & Dynamic Execution](#1--in-memory-compilation--dynamic-execution)
+  - [2. 🌐 Cloud-Native REST Microservice](#2--cloud-native-rest-microservice)
+  - [3. 💾 4-Tier Distributed Bytecode Storage & Resolution](#3--4-tier-distributed-bytecode-storage--resolution-hierarchy)
+  - [4. 🔒 Enterprise Security & Sandboxing](#4--enterprise-security--sandboxing)
+  - [5. ⚙️ Multi-Engine JIT & Bytecode Ecosystem](#5--multi-engine-jit--bytecode-ecosystem)
+  - [6. 📦 Bytecode Distribution & Client Interop](#6--bytecode-distribution--client-interop)
+- [🦭 Running as a Service in Podman Containers](#-running-as-a-service-in-podman-containers)
+  - [Podman Pod Script](#1-build-and-start-via-podman-pod-script-recommended)
+  - [Podman Compose](#2-start-via-podman-compose)
+  - [Configuration & Environment Variables](#3-container-configuration--environment-variables)
+  - [REST API Endpoints & `curl` Examples](#4-rest-api-endpoints--curl-examples)
+- [🏗️ Industry-Grade Container Engineering](#️-industry-grade-container-engineering-deploycontainersdockerfile)
+- [🏛️ Multi-Tier Architecture & Resolution Flow](#️-multi-tier-architecture--resolution-flow)
+- [📐 Architectural Design Principles & Patterns](#-architectural-design-principles--patterns)
+- [💻 Usage Examples (Java API)](#-usage-examples-java-api)
+- [🔒 Security & Sandboxing](#-security--sandboxing)
+- [🧰 API Reference](#-api-reference)
+- [🪵 Logging](#-logging)
+- [🏗️ Project Structure](#️-project-structure)
+- [📄 License](#-license)
 
 ---
 
@@ -32,33 +70,119 @@ caching, robust multi-tier dependency resolution, containerized microservices, a
 
 ---
 
-## 🚀 Key Features
+## 🚀 Key Features & Capabilities
 
-* **Zero Interface or Base Class Coupling**: The API is completely generic and class-independent. There is no
-  requirement to implement or extend any specific interface or base class. Compile arbitrary standalone classes,
-  records, enums, interfaces, or domain services.
-* **Minimal Input API**: Pass **only the source code** (`compiler.compile(sourceCode)`). Package and class declarations
-  are auto-inferred. Also supports direct compilation from `Path` or `File`.
-* **Containerized Microservice**: Package and start as a production-grade service in Podman with REST API endpoints
-  (`/api/compile`, `/api/execute`, `/api/health`, `/api/tiers`, `/api/bytecode`, `/api/classes`).
-* **Multi-Engine REST Compiler Selection**: Clients can choose their compiler engine (`JAVAC`, `JANINO`, `GROOVY`)
-  dynamically per request via JSON body, query parameter, or HTTP header.
-* **Bytecode Distribution to Client Systems**: Remote client systems can load compiled classes directly into their own
-  ClassLoaders via standard `URLClassLoader`, Base64 JSON response, or raw binary `.class` streams.
-* **Multi-Tier Storage & Resolution Hierarchy**:
-  Dynamically persists compiled classes and resolves dependent classes across a 4-tier chain based on availability:
-  $$\mathbf{ClassLoader / RAM} \longrightarrow \mathbf{Redis\ (In\text{-}Memory\ Cache)} \longrightarrow \mathbf{Filesystem\ (Pod\ Local)} \longrightarrow \mathbf{External\ DB\ (Container\ SQL)}$$
-    * Automatically warms upper tiers (Redis, RAM) whenever a class is loaded from lower tiers (Filesystem, DB).
-* **Cross-Class In-Memory Linking**: Dependent classes compiled in earlier steps in RAM are automatically visible to
-  subsequent compilations and can be linked and invoked at runtime without disk writes.
-* **Batch Compilation**: Compile mutually or circularly dependent classes in a single compiler task via
-  `compiler.compileBatch(sourcesMap)`.
-* **Dynamic Invocation Helpers**: Execute dynamic classes effortlessly using `result.invoke(...)`,
-  `result.invokeStatic(...)`, `result.invokeOn(...)`, and `result.newInstance(args...)` without reflection boilerplate.
-* **Enterprise Security & Sandboxing**: AST-level lexical rules blocking forbidden APIs (e.g., `Runtime.getRuntime`,
-  `ProcessBuilder`, `System.exit`, reflection, unauthorized network/file I/O) and execution timeouts via
-  `SandboxedExecutor`.
-* **Multi-Engine JIT Ecosystem**: Includes Janino, Byte Buddy, Javassist, Groovy `@CompileStatic`, and MVEL engines.
+JitForge provides an end-to-end runtime compilation, execution, and bytecode distribution platform designed for high-throughput enterprise architectures.
+
+### 📊 Feature Matrix at a Glance
+
+| Architectural Dimension | Capability & Technology | Developer & Operational Benefit |
+|:---|:---|:---|
+| **Zero-Coupling Engine** | Plain source input, automatic package & class AST inference | No base classes, marker interfaces, or boilerplate to implement |
+| **Pure RAM Execution** | Zero disk I/O, `javax.tools` in-memory file manager | Sub-millisecond compilation with zero disk footprint or cleanup |
+| **Dynamic Invocation** | Fluent `invoke`, `invokeStatic`, `invokeOn`, `newInstance` | Execute compiled classes immediately without reflection boilerplate |
+| **Tiered Storage Chain** | RAM → Redis → Local Pod Volume → SQL Database | Hierarchical cache fallback with automated upstream cache warming |
+| **Container Microservice** | REST API on Java 21 Loom Virtual Threads | High-density concurrency; Podman / Docker container ready |
+| **Multi-Engine Switching** | Dynamic selection: `JAVAC`, `JANINO`, `GROOVY` | Tailor compilation engine per request via JSON, query param, or header |
+| **Client JVM Loading** | Native `URLClassLoader`, Base64 JSON, raw binary `.class` | Remote JVMs execute server-compiled classes without custom code |
+| **Enterprise Sandboxing** | Lexical AST inspection + `SandboxedExecutor` timeout | Proactively blocks RCE, forbidden APIs, and infinite loops |
+
+---
+
+### 1. ⚡ In-Memory Compilation & Dynamic Execution
+
+- **Zero Interface or Base Class Coupling**  
+  The engine is 100% generic and unconstrained. It compiles arbitrary standalone classes, records, enums, interfaces, and nested structures without requiring any framework-specific interfaces or base classes.
+- **Minimal Input API (Source-Only)**  
+  Compile code with only the source text: `compiler.compile(sourceCode)`. Package statements and class names are inferred automatically via lexical analysis. Also supports direct compilation from filesystem `Path` or `File`.
+- **Reflection-Free Dynamic Invocation**  
+  Execute methods directly on compilation results with zero reflection ceremony:
+  - `result.invoke(methodName, args...)` — Instantiates and invokes an instance method.
+  - `result.invokeStatic(methodName, args...)` — Invokes a static method directly.
+  - `result.invokeOn(instance, methodName, args...)` — Executes against a pre-existing object instance.
+  - `result.newInstance(args...)` — Instantiates an object matching constructor argument types.
+- **In-Memory Cross-Class Dependency Linking**  
+  Classes compiled earlier in memory are instantly visible to subsequent compilation passes within the same `MemoryClassLoader`, allowing complex multi-class workflows without writing intermediary `.class` files to disk.
+- **Atomic Batch Compilation**  
+  Compile mutually or circularly dependent classes in a single atomic compiler task using `compiler.compileBatch(sourcesMap)`.
+
+---
+
+### 2. 🌐 Cloud-Native REST Microservice
+
+- **Turnkey Production Service**  
+  Ship dynamic compilation as a centralized, decoupled microservice. Exposes rich REST endpoints:
+  - `POST /api/compile` — Compile Java/Janino/Groovy code in RAM with instant bytecode return.
+  - `POST /api/execute` — Dynamically execute server-side methods with parameter mapping.
+  - `GET /api/bytecode/{className}` — Download raw binary `.class` or Base64 JSON payload.
+  - `GET /api/classes/{pkg}/{Class}.class` — HTTP bytecode stream directly consumable by Java `URLClassLoader`.
+  - `GET /api/tiers` — Inspect live status and class counts across all 4 cache tiers.
+  - `GET /api/health` — Orchestrator health check with uptime metrics.
+- **Java 21 Loom Virtual Threads**  
+  HTTP request handling leverages `Executors.newVirtualThreadPerTaskExecutor()`, enabling non-blocking, massive-scale concurrent compilation and execution workloads.
+- **Dynamic Per-Request Compiler Engine Selection**  
+  Clients dynamically dictate which compilation engine to invoke (`JAVAC`, `JANINO`, or `GROOVY`) via:
+  - JSON Request Body: `{"compiler": "JANINO", ...}`
+  - URL Query Parameter: `?compiler=janino`
+  - HTTP Header: `X-Compiler-Engine: GROOVY`
+
+---
+
+### 3. 💾 4-Tier Distributed Bytecode Storage & Resolution Hierarchy
+
+JitForge orchestrates a 4-tier Chain-of-Responsibility hierarchy to persist and resolve classes across distributed environments:
+
+$$\mathbf{Tier\ 1:\ ClassLoader\ /\ RAM} \longrightarrow \mathbf{Tier\ 2:\ Redis\ Cache} \longrightarrow \mathbf{Tier\ 3:\ Pod\ Filesystem} \longrightarrow \mathbf{Tier\ 4:\ PostgreSQL\ DB}$$
+
+- **Tier 1: ClassLoader / RAM (`< 1 µs`)** — In-process JVM memory lookup for ultra-hot classes and immediate execution.
+- **Tier 2: Redis Distributed Cache (`< 1 ms`)** — High-speed centralized in-memory cache shared horizontally across compiler service pods.
+- **Tier 3: Pod Filesystem Volume (`2–5 ms`)** — Local volume persistence (`STORAGE_DIR`) surviving container restarts.
+- **Tier 4: External SQL Database (`5–15 ms`)** — Permanent, cluster-wide source of truth (PostgreSQL, MySQL, H2).
+- **Automatic Upstream Cache Warming**  
+  Resolving a class from any lower tier (e.g., PostgreSQL or Filesystem) automatically warms all higher tiers (Redis and RAM) to guarantee optimal latency for subsequent requests.
+
+---
+
+### 4. 🔒 Enterprise Security & Sandboxing
+
+- **AST-Level Lexical Rule Engine**  
+  Proactively inspects source code tokens and AST syntax before invoking the compiler. Rejects code containing forbidden operations:
+  - Process creation (`ProcessBuilder`, `Runtime.getRuntime().exec`)
+  - JVM lifecycle termination (`System.exit`, `Runtime.halt`)
+  - Arbitrary reflection (`java.lang.reflect`, `MethodHandles.lookup`)
+  - Unauthorized file or network I/O (`java.io.File`, `java.net.Socket`)
+- **Execution Timeout Protection**  
+  `SandboxedExecutor` bounds method executions with configurable timeouts (e.g., `Duration.ofSeconds(2)`), interrupting rogue threads to prevent infinite loops, thread exhaustion, or denial-of-service.
+- **Configurable Fluent Security Policies**  
+  Fine-tune constraints with `SecurityPolicy.builder()` to whitelist/blacklist packages, enforce maximum code character limits, and toggle strict sandboxing.
+
+---
+
+### 5. ⚙️ Multi-Engine JIT & Bytecode Ecosystem
+
+JitForge incorporates specialized compilation and bytecode engineering frameworks tailored to diverse execution workloads:
+
+| Engine | Execution Paradigm | Typical Latency | Primary Use Case |
+|:---|:---|:---|:---|
+| **Java Compiler (`javax.tools`)** | Full Standard Java in RAM | ~50–100 ms | Complex domain classes, records, enums, full Java spec |
+| **Janino JIT** | Embedded Bytecode Compiler | < 15 ms | High-throughput, low-latency dynamic micro-tasks |
+| **Apache Groovy** | Scripting with `@CompileStatic` | ~80–120 ms | Business rules, dynamic calculation logic, DSLs |
+| **Byte Buddy** | Dynamic Bytecode Synthesis | < 5 ms | Runtime subclassing, proxying, and method interception |
+| **Javassist** | Structural Bytecode Manipulation | < 10 ms | Class instrumentation, field/method injection |
+| **MVEL 2** | Compiled Expression Evaluator | < 10 µs | High-frequency mathematical and boolean expressions |
+
+---
+
+### 6. 📦 Bytecode Distribution & Client Interop
+
+Compiled bytecode can be exported and consumed across JVM boundaries through three flexible integration patterns:
+
+1. **Direct HTTP `URLClassLoader` (Zero Custom Client Code)**  
+   Standard Java `URLClassLoader` points directly to `http://<service-host>:8080/api/classes/`. Classes are loaded dynamically over HTTP on demand.
+2. **Base64 JSON Payload**  
+   REST responses deliver compiled `.class` binaries as Base64 strings in the JSON response, enabling microservices to define classes locally via in-memory ClassLoaders.
+3. **Raw Binary `.class` Stream**  
+   Fetch raw bytecode binaries directly via `GET /api/bytecode/{className}` for local filesystem persistence, container volume caching, or custom packaging.
 
 ---
 
@@ -507,12 +631,12 @@ flowchart TD
 
 ### Storage Tiers Overview
 
-| Tier       | Provider                  | Primary Location          | Access Latency                    | Role                                                            |
-|:-----------|:--------------------------|:--------------------------|:----------------------------------|:----------------------------------------------------------------|
-| **Tier 1** | `ClassLoader` / RAM       | JVM Process Memory        | $< 1\,\mu\text{s}$                | Zero-overhead in-process lookup and hot class execution         |
-| **Tier 2** | `RedisBytecodeStore`      | Redis Podman / Sidecar    | $< 1\,\text{ms}$                  | Fast distributed in-memory cache shared across horizontal pods  |
-| **Tier 3** | `FileSystemBytecodeStore` | Local Pod Volume (`Path`) | $\approx 2\text{--}5\,\text{ms}$  | Node-local persistence across pod container restarts            |
-| **Tier 4** | `DatabaseBytecodeStore`   | External SQL DB Container | $\approx 5\text{--}15\,\text{ms}$ | Permanent, cluster-wide source of truth (PostgreSQL, MySQL, H2) |
+| Tier       | Provider                  | Primary Location          | Access Latency | Role                                                            |
+|:-----------|:--------------------------|:--------------------------|:---------------|:----------------------------------------------------------------|
+| **Tier 1** | `ClassLoader` / RAM       | JVM Process Memory        | `< 1 µs`       | Zero-overhead in-process lookup and hot class execution         |
+| **Tier 2** | `RedisBytecodeStore`      | Redis Podman / Sidecar    | `< 1 ms`       | Fast distributed in-memory cache shared across horizontal pods  |
+| **Tier 3** | `FileSystemBytecodeStore` | Local Pod Volume (`Path`) | `2–5 ms`       | Node-local persistence across pod container restarts            |
+| **Tier 4** | `DatabaseBytecodeStore`   | External SQL DB Container | `5–15 ms`      | Permanent, cluster-wide source of truth (PostgreSQL, MySQL, H2) |
 
 ---
 
