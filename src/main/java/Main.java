@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import umrao.compile.OnTheFlyCompiler;
@@ -19,6 +36,8 @@ import java.nio.file.Path;
  * <p>
  * Retains explicit class and standard {@code public static void main(String[] args)} signature
  * to maintain strict compliance with Java 21 LTS without requiring preview flags.
+ *
+ * @author Vivek Umrao
  */
 @SuppressWarnings({"ConvertCompactSourceFile", "RedundantModifiersUtilityClass"})
 public class Main {
@@ -50,14 +69,14 @@ public class Main {
 
     private static void startServiceDaemon() {
         System.out.println("================================================================================");
-        System.out.println("        STARTING RUNTIME COMPILATION & TIERED STORAGE REST SERVICE             ");
+        System.out.println("        STARTING JITFORGE RUNTIME COMPILATION & TIERED STORAGE SERVICE         ");
         System.out.println("================================================================================");
 
         try {
             CompilerHttpService service = CompilerHttpService.fromEnvironment();
             service.start();
 
-            System.out.printf("Service is actively listening on HTTP port: %d%n", service.getPort());
+            System.out.printf("JitForge service is actively listening on HTTP port: %d%n", service.getPort());
             System.out.println("Endpoints available:");
             System.out.println("  - GET  /api/health   : Health & Uptime status");
             System.out.println("  - GET  /api/tiers    : Multi-tier storage hierarchy status");
@@ -68,21 +87,21 @@ public class Main {
             System.out.println("================================================================================");
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Shutting down RuntimeCompile service...");
+                System.out.println("Shutting down JitForge service...");
                 service.stop();
             }));
 
             // Keep alive
             Thread.currentThread().join();
         } catch (Exception e) {
-            log.error("Failed to start RuntimeCompile service: {}", e.getMessage(), e);
+            log.error("Failed to start JitForge service: {}", e.getMessage(), e);
             System.exit(1);
         }
     }
 
     private static void runSuiteDemo(String[] args) {
         System.out.println("================================================================================");
-        System.out.println("           ENTERPRISE RUNTIME COMPILATION & JIT EXECUTION SUITE                 ");
+        System.out.println("             JITFORGE ENTERPRISE RUNTIME COMPILATION & JIT SUITE               ");
         System.out.println("================================================================================");
 
         DynamicCompiler compiler = new InMemoryCompiler();

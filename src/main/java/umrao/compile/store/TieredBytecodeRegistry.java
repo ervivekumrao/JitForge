@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.store;
 
 import org.slf4j.Logger;
@@ -24,10 +41,13 @@ import java.util.jar.JarFile;
  * <b>ClassLoader &gt; Redis (In-Memory Cache) &gt; Filesystem (Pod Local) &gt; DB (External SQL Database)</b>.
  * <p>
  * Automatically warms upper tiers when a dependent class is retrieved from a lower tier.
+ *
+ * @author Vivek Umrao
  */
 public class TieredBytecodeRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(TieredBytecodeRegistry.class);
+    private static final int MAX_IN_MEMORY_ENTRIES = 5000;
 
     private final Map<String, byte[]> inMemoryRepository = new ConcurrentHashMap<>();
     private volatile ClassLoader classLoader;
@@ -57,7 +77,13 @@ public class TieredBytecodeRegistry {
             return;
         }
 
-        // 1. Always retain in RAM repository
+        // 1. Always retain in RAM repository with size boundary protection
+        if (inMemoryRepository.size() >= MAX_IN_MEMORY_ENTRIES && !inMemoryRepository.containsKey(className)) {
+            var it = inMemoryRepository.keySet().iterator();
+            if (it.hasNext()) {
+                inMemoryRepository.remove(it.next());
+            }
+        }
         inMemoryRepository.put(className, bytecode);
 
         // 2. Persist to Redis (fast distributed in-memory cache)

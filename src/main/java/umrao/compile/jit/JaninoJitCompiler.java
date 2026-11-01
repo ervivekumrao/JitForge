@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.jit;
 
 import org.codehaus.commons.compiler.util.resource.MapResourceCreator;
@@ -15,6 +32,8 @@ import java.util.Map;
  * Janino Embedded JIT Compiler:
  * Ultra-fast embedded compiler widely used in big-data engines (Apache Spark, Presto, Calcite)
  * for runtime query JIT generation and high-throughput class compilation.
+ *
+ * @author Vivek Umrao
  */
 @SuppressWarnings("unused")
 public class JaninoJitCompiler {

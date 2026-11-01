@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+# Developer: Vivek Umrao
+# ==============================================================================
 set -e
 
-POD_NAME="compiler-pod"
-VOLUME_NAME="compiler-classes-vol"
-PG_VOLUME="compiler-pg-vol"
-REDIS_VOLUME="compiler-redis-vol"
+POD_NAME="jitforge-pod"
+VOLUME_NAME="jitforge-classes-vol"
+PG_VOLUME="jitforge-pg-vol"
+REDIS_VOLUME="jitforge-redis-vol"
 
 echo "=== [1/4] Ensuring Podman volumes exist and configuring permissions ==="
 podman volume create $VOLUME_NAME 2>/dev/null || true
@@ -26,41 +30,42 @@ else
 fi
 
 echo "=== [3/4] Starting PostgreSQL & Redis storage tier containers ==="
-if ! podman container exists compiler-postgres 2>/dev/null; then
+if ! podman container exists jitforge-postgres 2>/dev/null; then
     podman run -d --pod $POD_NAME \
-      --name compiler-postgres \
+      --name jitforge-postgres \
       --restart unless-stopped \
       -e POSTGRES_DB=bytecode_db \
       -e POSTGRES_USER=compiler_user \
       -e POSTGRES_PASSWORD=compiler_pass \
       -v $PG_VOLUME:/var/lib/postgresql/data \
       docker.io/library/postgres:15
-    echo "compiler-postgres container started."
+    echo "jitforge-postgres container started."
 else
-    podman start compiler-postgres 2>/dev/null || true
+    podman start jitforge-postgres 2>/dev/null || true
 fi
 
-if ! podman container exists compiler-redis 2>/dev/null; then
+if ! podman container exists jitforge-redis 2>/dev/null; then
     podman run -d --pod $POD_NAME \
-      --name compiler-redis \
+      --name jitforge-redis \
       --restart unless-stopped \
       -v $REDIS_VOLUME:/data \
       docker.io/library/redis:7.2-alpine
-    echo "compiler-redis container started."
+    echo "jitforge-redis container started."
 else
-    podman start compiler-redis 2>/dev/null || true
+    podman start jitforge-redis 2>/dev/null || true
 fi
 
 echo "=== Waiting for storage backends to initialize ==="
 sleep 3
 
-echo "=== [4/4] Starting RuntimeCompile REST microservice ==="
-if ! podman container exists runtime-compiler-service 2>/dev/null; then
+echo "=== [4/4] Starting JitForge REST microservice ==="
+if ! podman container exists jitforge-service 2>/dev/null; then
     podman run -d --pod $POD_NAME \
-      --name runtime-compiler-service \
+      --name jitforge-service \
       --restart unless-stopped \
       -e SERVER_PORT=8080 \
       -e COMPILER_SERVICE=true \
+      -e SECURITY_SANDBOX_ENABLED=true \
       -e STORAGE_DIR=/var/data/compiler/classes \
       -e REDIS_HOST=localhost \
       -e REDIS_PORT=6379 \
@@ -68,15 +73,15 @@ if ! podman container exists runtime-compiler-service 2>/dev/null; then
       -e DB_USER=compiler_user \
       -e DB_PASSWORD=compiler_pass \
       -v $VOLUME_NAME:/var/data/compiler/classes \
-      localhost/runtime-compile:latest
-    echo "runtime-compiler-service container started."
+      localhost/jitforge:latest
+    echo "jitforge-service container started."
 else
-    podman start runtime-compiler-service 2>/dev/null || true
+    podman start jitforge-service 2>/dev/null || true
 fi
 
 echo ""
 echo "================================================================================"
-echo "RuntimeCompile service successfully launched in Podman pod: $POD_NAME"
+echo "JitForge service successfully launched in Podman pod: $POD_NAME"
 echo "  - Service URL: http://localhost:8080"
 echo "  - Health Check: curl http://localhost:8080/api/health"
 echo "  - Tiers Status: curl http://localhost:8080/api/tiers"

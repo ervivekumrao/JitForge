@@ -1,6 +1,25 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.api;
 
 import umrao.compile.engine.JavaSourceParser;
+import umrao.compile.security.CodeSecurityValidator;
+import umrao.compile.security.SecurityPolicy;
 import umrao.compile.store.TieredBytecodeRegistry;
 
 import java.io.File;
@@ -17,6 +36,8 @@ import java.util.Map;
  * High-performance, in-memory, thread-safe dynamic Java compiler interface.
  * Supports taking only source code input (auto-inferring class declarations)
  * and resolving dependencies across tiered persistence: ClassLoader &gt; Redis &gt; Filesystem &gt; DB.
+ *
+ * @author Vivek Umrao
  */
 @SuppressWarnings("unused")
 public interface DynamicCompiler {
@@ -209,4 +230,11 @@ public interface DynamicCompiler {
      * Clears all cached compiled classes across cache and tiered registries.
      */
     void clearCache();
+
+    /**
+     * Returns the security validator associated with this compiler instance.
+     */
+    default CodeSecurityValidator getSecurityValidator() {
+        return new CodeSecurityValidator(SecurityPolicy.permissive());
+    }
 }

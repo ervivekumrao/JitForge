@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.engine;
 
 import umrao.compile.store.TieredBytecodeRegistry;
@@ -20,9 +37,15 @@ import java.util.jar.JarFile;
  * Isolated ClassLoader that loads dynamically compiled classes directly from memory buffers.
  * Supports child-first lookup for in-memory bytecodes, compilation paths (directories and JARs),
  * and tiered resolution (ClassLoader &gt; Redis &gt; Filesystem &gt; External DB).
+ *
+ * @author Vivek Umrao
  */
 @SuppressWarnings("unused")
 public class MemoryClassLoader extends ClassLoader {
+
+    static {
+        registerAsParallelCapable();
+    }
 
     private final Map<String, byte[]> bytecodes = new ConcurrentHashMap<>();
     private final List<Path> compilationPaths = new CopyOnWriteArrayList<>();

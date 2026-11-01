@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.service;
 
 import com.sun.net.httpserver.HttpServer;
@@ -5,8 +22,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import umrao.compile.api.DynamicCompiler;
 import umrao.compile.engine.InMemoryCompiler;
+import umrao.compile.security.SecurityPolicy;
 import umrao.compile.service.config.CompilerServiceConfig;
-import umrao.compile.service.handler.*;
+import umrao.compile.service.handler.BytecodeHandler;
+import umrao.compile.service.handler.CompileHandler;
+import umrao.compile.service.handler.ExecuteHandler;
+import umrao.compile.service.handler.HealthHandler;
+import umrao.compile.service.handler.TiersStatusHandler;
 import umrao.compile.store.BytecodeStore;
 import umrao.compile.store.DatabaseBytecodeStore;
 import umrao.compile.store.FileSystemBytecodeStore;
@@ -28,6 +50,8 @@ import java.util.concurrent.Executors;
  * - Single Responsibility: routing and lifecycle management only.
  * - Dependency Inversion: depends on DynamicCompiler and TieredBytecodeRegistry abstractions.
  * - 12-Factor App: configurable via CompilerServiceConfig.
+ *
+ * @author Vivek Umrao
  */
 @SuppressWarnings("unused")
 public class CompilerHttpService {
@@ -97,7 +121,10 @@ public class CompilerHttpService {
             dbStore = DatabaseBytecodeStore.h2InMemory("service_bytecode_db");
         }
 
+        SecurityPolicy effectivePolicy = config.sandboxEnabled() ? SecurityPolicy.strict() : SecurityPolicy.permissive();
+
         DynamicCompiler dynamicCompiler = InMemoryCompiler.builder()
+                .withSecurityPolicy(effectivePolicy)
                 .withRedisStore(redisStore)
                 .withFileSystemStore(fileSystemStore)
                 .withDatabaseStore(dbStore)
@@ -127,7 +154,7 @@ public class CompilerHttpService {
         server.createContext("/api/classes", new BytecodeHandler(compiler, registry));
 
         server.start();
-        log.info("RuntimeCompile HTTP service started on port {}", server.getAddress().getPort());
+        log.info("JitForge HTTP service started on port {}", server.getAddress().getPort());
     }
 
     /**
@@ -142,7 +169,13 @@ public class CompilerHttpService {
             executor.shutdown();
             executor = null;
         }
-        log.info("RuntimeCompile HTTP service stopped.");
+        if (registry != null && registry.getRedisStore() instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception ignored) {
+            }
+        }
+        log.info("JitForge HTTP service stopped.");
     }
 
     public synchronized boolean isRunning() {

@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+# Developer: Vivek Umrao
+# ==============================================================================
 
-POD_NAME="compiler-pod"
+POD_NAME="jitforge-pod"
 
 echo "Stopping containers in pod: $POD_NAME..."
-podman stop runtime-compiler-service compiler-postgres compiler-redis 2>/dev/null || true
+podman stop jitforge-service jitforge-postgres jitforge-redis 2>/dev/null || true
 
 echo "Removing containers..."
-podman rm runtime-compiler-service compiler-postgres compiler-redis 2>/dev/null || true
+podman rm jitforge-service jitforge-postgres jitforge-redis 2>/dev/null || true
 
 echo "Removing pod: $POD_NAME..."
 podman pod rm $POD_NAME 2>/dev/null || true
 
-echo "RuntimeCompile pod and containers stopped."
+echo "JitForge pod and containers stopped."

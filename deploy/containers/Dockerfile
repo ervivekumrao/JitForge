@@ -14,13 +14,13 @@ COPY gradle/ ./gradle/
 COPY src/ ./src/
 
 # Use prebuilt distribution if available (sub-second inner-loop build), or build hermetically
-COPY build/install/runtime-compile* /workspace/prebuilt/
+COPY build/install/jitforge* /workspace/prebuilt/
 RUN if [ -d "/workspace/prebuilt/bin" ]; then \
         cp -r /workspace/prebuilt /workspace/dist; \
-    elif [ -d "/workspace/prebuilt/runtime-compile/bin" ]; then \
-        cp -r /workspace/prebuilt/runtime-compile /workspace/dist; \
+    elif [ -d "/workspace/prebuilt/jitforge/bin" ]; then \
+        cp -r /workspace/prebuilt/jitforge /workspace/dist; \
     else \
-        ./gradlew installDist --no-daemon && cp -r build/install/runtime-compile /workspace/dist; \
+        ./gradlew installDist --no-daemon && cp -r build/install/jitforge /workspace/dist; \
     fi
 
 # ==============================================================================
@@ -29,10 +29,11 @@ RUN if [ -d "/workspace/prebuilt/bin" ]; then \
 FROM docker.io/library/eclipse-temurin:21-jdk-jammy AS runtime
 
 # OpenContainers image metadata labels
-LABEL org.opencontainers.image.title="RuntimeCompile" \
+LABEL org.opencontainers.image.title="JitForge" \
       org.opencontainers.image.description="Enterprise In-Memory Java Runtime Compilation, JIT Execution & Tiered Bytecode Microservice" \
       org.opencontainers.image.version="1.0.0" \
-      org.opencontainers.image.vendor="Umrao Enterprise" \
+      org.opencontainers.image.authors="Vivek Umrao" \
+      org.opencontainers.image.vendor="Vivek Umrao" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 # Principle of Least Privilege: Create unprivileged system group and user
@@ -52,6 +53,7 @@ COPY --from=builder --chown=compiler:compiler /workspace/dist /app
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom" \
     SERVER_PORT=8080 \
     COMPILER_SERVICE=true \
+    SECURITY_SANDBOX_ENABLED=true \
     STORAGE_DIR=/var/data/compiler/classes \
     REDIS_HOST="" \
     REDIS_PORT=6379 \
@@ -74,4 +76,4 @@ HEALTHCHECK --interval=20s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${SERVER_PORT}/api/health || exit 1
 
 # Exec form entrypoint for clean PID 1 signal handling and graceful shutdown
-ENTRYPOINT ["/app/bin/runtime-compile", "--server"]
+ENTRYPOINT ["/app/bin/jitforge", "--server"]

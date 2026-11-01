@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile;
 
 import org.junit.jupiter.api.DisplayName;
@@ -38,17 +55,18 @@ class TieredBytecodeStoreTest {
     @Test
     @DisplayName("RedisBytecodeStore: Should save, load, and discover classes in in-memory distributed cache")
     void testRedisStore() {
-        BytecodeStore redisStore = RedisBytecodeStore.inMemory();
-        byte[] dummyBytecode = new byte[]{10, 20, 30};
+        try (RedisBytecodeStore redisStore = RedisBytecodeStore.inMemory()) {
+            byte[] dummyBytecode = new byte[]{10, 20, 30};
 
-        redisStore.save("com.example.CachedClass", dummyBytecode);
+            redisStore.save("com.example.CachedClass", dummyBytecode);
 
-        assertThat(redisStore.contains("com.example.CachedClass")).isTrue();
-        Optional<byte[]> loaded = redisStore.load("com.example.CachedClass");
-        assertThat(loaded).isPresent();
-        assertThat(loaded.get()).isEqualTo(dummyBytecode);
+            assertThat(redisStore.contains("com.example.CachedClass")).isTrue();
+            Optional<byte[]> loaded = redisStore.load("com.example.CachedClass");
+            assertThat(loaded).isPresent();
+            assertThat(loaded.get()).isEqualTo(dummyBytecode);
 
-        assertThat(redisStore.loadPackage("com.example", false)).containsKey("com.example.CachedClass");
+            assertThat(redisStore.loadPackage("com.example", false)).containsKey("com.example.CachedClass");
+        }
     }
 
     @Test
@@ -70,49 +88,50 @@ class TieredBytecodeStoreTest {
     @Test
     @DisplayName("TieredBytecodeRegistry: Should enforce strict lookup order ClassLoader > Redis > Filesystem > DB and warm upper tiers")
     void testTieredLookupPriorityAndWarming(@TempDir Path tempDir) {
-        BytecodeStore redisStore = RedisBytecodeStore.inMemory();
-        BytecodeStore fsStore = new FileSystemBytecodeStore(tempDir);
-        BytecodeStore dbStore = DatabaseBytecodeStore.h2InMemory("tiered_warming_db");
+        try (RedisBytecodeStore redisStore = RedisBytecodeStore.inMemory()) {
+            BytecodeStore fsStore = new FileSystemBytecodeStore(tempDir);
+            BytecodeStore dbStore = DatabaseBytecodeStore.h2InMemory("tiered_warming_db");
 
-        byte[] dbBytes = new byte[]{1, 1, 1};
-        byte[] fsBytes = new byte[]{2, 2, 2};
-        byte[] redisBytes = new byte[]{3, 3, 3};
+            byte[] dbBytes = new byte[]{1, 1, 1};
+            byte[] fsBytes = new byte[]{2, 2, 2};
+            byte[] redisBytes = new byte[]{3, 3, 3};
 
-        // 1. Put Item A only in DB (Tier 4)
-        dbStore.save("com.test.ItemA", dbBytes);
+            // 1. Put Item A only in DB (Tier 4)
+            dbStore.save("com.test.ItemA", dbBytes);
 
-        TieredBytecodeRegistry registry = TieredBytecodeRegistry.builder()
-                .withRedisStore(redisStore)
-                .withFileSystemStore(fsStore)
-                .withDatabaseStore(dbStore)
-                .build();
+            TieredBytecodeRegistry registry = TieredBytecodeRegistry.builder()
+                    .withRedisStore(redisStore)
+                    .withFileSystemStore(fsStore)
+                    .withDatabaseStore(dbStore)
+                    .build();
 
-        // Lookup Item A: Should resolve from DB and automatically warm Filesystem and Redis!
-        Optional<byte[]> foundA = registry.findBytecode("com.test.ItemA");
-        assertThat(foundA).isPresent();
-        assertThat(foundA.get()).isEqualTo(dbBytes);
+            // Lookup Item A: Should resolve from DB and automatically warm Filesystem and Redis!
+            Optional<byte[]> foundA = registry.findBytecode("com.test.ItemA");
+            assertThat(foundA).isPresent();
+            assertThat(foundA.get()).isEqualTo(dbBytes);
 
-        // Verify warming occurred in Redis and Filesystem tiers
-        assertThat(fsStore.contains("com.test.ItemA")).isTrue();
-        assertThat(redisStore.contains("com.test.ItemA")).isTrue();
+            // Verify warming occurred in Redis and Filesystem tiers
+            assertThat(fsStore.contains("com.test.ItemA")).isTrue();
+            assertThat(redisStore.contains("com.test.ItemA")).isTrue();
 
-        // 2. Put Item B in Filesystem (Tier 3) and DB (Tier 4) -> Filesystem must win
-        fsStore.save("com.test.ItemB", fsBytes);
-        dbStore.save("com.test.ItemB", dbBytes);
+            // 2. Put Item B in Filesystem (Tier 3) and DB (Tier 4) -> Filesystem must win
+            fsStore.save("com.test.ItemB", fsBytes);
+            dbStore.save("com.test.ItemB", dbBytes);
 
-        Optional<byte[]> foundB = registry.findBytecode("com.test.ItemB");
-        assertThat(foundB).isPresent();
-        assertThat(foundB.get()).isEqualTo(fsBytes); // Filesystem prioritized over DB
-        assertThat(redisStore.contains("com.test.ItemB")).isTrue(); // Warmed into Redis
+            Optional<byte[]> foundB = registry.findBytecode("com.test.ItemB");
+            assertThat(foundB).isPresent();
+            assertThat(foundB.get()).isEqualTo(fsBytes); // Filesystem prioritized over DB
+            assertThat(redisStore.contains("com.test.ItemB")).isTrue(); // Warmed into Redis
 
-        // 3. Put Item C in Redis (Tier 2), Filesystem (Tier 3), and DB (Tier 4) -> Redis must win
-        redisStore.save("com.test.ItemC", redisBytes);
-        fsStore.save("com.test.ItemC", fsBytes);
-        dbStore.save("com.test.ItemC", dbBytes);
+            // 3. Put Item C in Redis (Tier 2), Filesystem (Tier 3), and DB (Tier 4) -> Redis must win
+            redisStore.save("com.test.ItemC", redisBytes);
+            fsStore.save("com.test.ItemC", fsBytes);
+            dbStore.save("com.test.ItemC", dbBytes);
 
-        Optional<byte[]> foundC = registry.findBytecode("com.test.ItemC");
-        assertThat(foundC).isPresent();
-        assertThat(foundC.get()).isEqualTo(redisBytes); // Redis prioritized over Filesystem & DB
+            Optional<byte[]> foundC = registry.findBytecode("com.test.ItemC");
+            assertThat(foundC).isPresent();
+            assertThat(foundC.get()).isEqualTo(redisBytes); // Redis prioritized over Filesystem & DB
+        }
     }
 
     @Test
@@ -128,7 +147,10 @@ class TieredBytecodeStoreTest {
         String productCode = """
                 package umrao.inventory;
 
-                public class Product {
+                /**
+ * @author Vivek Umrao
+ */
+public class Product {
                     private final String sku;
                     private final double basePrice;
 
@@ -179,41 +201,41 @@ class TieredBytecodeStoreTest {
     @Test
     @DisplayName("End-to-End Compiler: Should resolve dependent class from Redis cache across independent compiler instances")
     void testCompilerResolvesDependencyFromRedis() {
-        BytecodeStore redisStore = RedisBytecodeStore.inMemory();
+        try (RedisBytecodeStore redisStore = RedisBytecodeStore.inMemory()) {
+            // Compiler 1 saves compiled class to Redis
+            DynamicCompiler compiler1 = InMemoryCompiler.builder()
+                    .withRedisStore(redisStore)
+                    .build();
 
-        // Compiler 1 saves compiled class to Redis
-        DynamicCompiler compiler1 = InMemoryCompiler.builder()
-                .withRedisStore(redisStore)
-                .build();
-
-        String accountCode = """
-                package umrao.finance;
-                public class Account {
-                    private final double balance;
-                    public Account(double balance) { this.balance = balance; }
-                    public double getBalance() { return balance; }
-                }
-                """;
-        compiler1.compile(accountCode);
-        assertThat(redisStore.contains("umrao.finance.Account")).isTrue();
-
-        // Compiler 2 starts up fresh with only Redis configured
-        DynamicCompiler compiler2 = InMemoryCompiler.builder()
-                .withRedisStore(redisStore)
-                .build();
-
-        String auditCode = """
-                package umrao.finance.audit;
-                import umrao.finance.Account;
-
-                public class AccountAuditor {
-                    public boolean isHealthy(Account account) {
-                        return account.getBalance() > 0;
+            String accountCode = """
+                    package umrao.finance;
+                    public class Account {
+                        private final double balance;
+                        public Account(double balance) { this.balance = balance; }
+                        public double getBalance() { return balance; }
                     }
-                }
-                """;
+                    """;
+            compiler1.compile(accountCode);
+            assertThat(redisStore.contains("umrao.finance.Account")).isTrue();
 
-        CompilationResult<Object> auditResult = compiler2.compile(auditCode);
-        assertThat(auditResult.isSuccess()).isTrue();
+            // Compiler 2 starts up fresh with only Redis configured
+            DynamicCompiler compiler2 = InMemoryCompiler.builder()
+                    .withRedisStore(redisStore)
+                    .build();
+
+            String auditCode = """
+                    package umrao.finance.audit;
+                    import umrao.finance.Account;
+
+                    public class AccountAuditor {
+                        public boolean isHealthy(Account account) {
+                            return account.getBalance() > 0;
+                        }
+                    }
+                    """;
+
+            CompilationResult<Object> auditResult = compiler2.compile(auditCode);
+            assertThat(auditResult.isSuccess()).isTrue();
+        }
     }
 }

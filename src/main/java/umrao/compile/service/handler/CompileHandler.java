@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.service.handler;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -13,6 +30,7 @@ import umrao.compile.api.DynamicCompiler;
 import umrao.compile.engine.JavaSourceParser;
 import umrao.compile.jit.GroovyJitCompiler;
 import umrao.compile.jit.JaninoJitCompiler;
+import umrao.compile.security.SecurityViolationException;
 import umrao.compile.service.util.HttpJsonResponder;
 
 import javax.tools.Diagnostic;
@@ -28,6 +46,8 @@ import java.util.Map;
  * REST endpoint handler for compiling arbitrary standalone Java or Groovy source code
  * with pluggable compiler engine selection (JAVAC, JANINO, GROOVY),
  * returning the compiled bytecode and automatically persisting it across active storage tiers.
+ *
+ * @author Vivek Umrao
  */
 public class CompileHandler implements HttpHandler {
 
@@ -131,6 +151,12 @@ public class CompileHandler implements HttpHandler {
             } else {
                 sendDiagnosticFailure(exchange, elapsedMs, "Compilation failed", result.getDiagnostics());
             }
+        } catch (SecurityViolationException sve) {
+            long elapsedMs = (System.nanoTime() - startNano) / 1_000_000;
+            List<CompilationDiagnostic> diags = List.of(
+                    new CompilationDiagnostic(Diagnostic.Kind.ERROR, -1, -1, sve.getViolationRule(), sve.getMessage())
+            );
+            sendDiagnosticFailure(exchange, elapsedMs, "Security violation: " + sve.getMessage(), diags);
         } catch (CompilationException ce) {
             long elapsedMs = (System.nanoTime() - startNano) / 1_000_000;
             sendDiagnosticFailure(exchange, elapsedMs, ce.getMessage(), ce.getDiagnostics());
@@ -142,6 +168,9 @@ public class CompileHandler implements HttpHandler {
 
     private void compileWithJanino(HttpExchange exchange, String sourceCode, long startNano) throws IOException {
         try {
+            if (compiler.getSecurityValidator() != null) {
+                compiler.getSecurityValidator().validate(sourceCode);
+            }
             String className = JavaSourceParser.parseFullClassName(sourceCode);
             Map<String, byte[]> bytecodes = janinoCompiler.compileToBytecodes(className, sourceCode);
             for (Map.Entry<String, byte[]> entry : bytecodes.entrySet()) {
@@ -160,6 +189,12 @@ public class CompileHandler implements HttpHandler {
                     HttpJsonResponder.escapeJson(className), elapsedMs, b64Bytecode
             );
             HttpJsonResponder.sendJson(exchange, 200, json);
+        } catch (SecurityViolationException sve) {
+            long elapsedMs = (System.nanoTime() - startNano) / 1_000_000;
+            List<CompilationDiagnostic> diags = List.of(
+                    new CompilationDiagnostic(Diagnostic.Kind.ERROR, -1, -1, sve.getViolationRule(), sve.getMessage())
+            );
+            sendDiagnosticFailure(exchange, elapsedMs, "Security violation: " + sve.getMessage(), diags);
         } catch (Exception e) {
             long elapsedMs = (System.nanoTime() - startNano) / 1_000_000;
             Throwable cause = e.getCause() != null ? e.getCause() : e;
@@ -176,6 +211,9 @@ public class CompileHandler implements HttpHandler {
 
     private void compileWithGroovy(HttpExchange exchange, String sourceCode, long startNano) throws IOException {
         try {
+            if (compiler.getSecurityValidator() != null) {
+                compiler.getSecurityValidator().validate(sourceCode);
+            }
             String className;
             try {
                 className = JavaSourceParser.parseFullClassName(sourceCode);
@@ -199,6 +237,12 @@ public class CompileHandler implements HttpHandler {
                     HttpJsonResponder.escapeJson(className), elapsedMs, b64Bytecode
             );
             HttpJsonResponder.sendJson(exchange, 200, json);
+        } catch (SecurityViolationException sve) {
+            long elapsedMs = (System.nanoTime() - startNano) / 1_000_000;
+            List<CompilationDiagnostic> diags = List.of(
+                    new CompilationDiagnostic(Diagnostic.Kind.ERROR, -1, -1, sve.getViolationRule(), sve.getMessage())
+            );
+            sendDiagnosticFailure(exchange, elapsedMs, "Security violation: " + sve.getMessage(), diags);
         } catch (Exception e) {
             long elapsedMs = (System.nanoTime() - startNano) / 1_000_000;
             Throwable cause = e.getCause() != null ? e.getCause() : e;

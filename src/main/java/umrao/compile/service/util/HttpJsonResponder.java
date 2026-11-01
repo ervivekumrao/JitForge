@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.service.util;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -13,9 +30,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Utility for reading HTTP payloads and writing standardized JSON responses.
+ * Utility for reading HTTP payloads and writing standardized RFC 8259 JSON responses
+ * with size boundary checks and control character escaping.
+ *
+ * @author Vivek Umrao
  */
 public final class HttpJsonResponder {
+
+    public static final int MAX_BODY_BYTES = 10 * 1024 * 1024; // 10MB protection against OOM
 
     private HttpJsonResponder() {
     }
@@ -39,7 +61,12 @@ public final class HttpJsonResponder {
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             byte[] buf = new byte[4096];
             int read;
+            int total = 0;
             while ((read = is.read(buf)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new IOException("Request payload exceeds maximum permitted size of " + MAX_BODY_BYTES + " bytes");
+                }
                 baos.write(buf, 0, read);
             }
             return baos.toString(StandardCharsets.UTF_8);
@@ -48,13 +75,27 @@ public final class HttpJsonResponder {
 
     public static String escapeJson(String s) {
         if (s == null) return "";
-        return s.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\b", "\\b")
-                .replace("\f", "\\f")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        return sb.toString();
     }
 
     public static String extractJsonStringField(String json, String field) {
@@ -89,7 +130,7 @@ public final class HttpJsonResponder {
 
     public static String unescapeJson(String s) {
         if (s == null) return "";
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == '\\' && i + 1 < s.length()) {
@@ -103,6 +144,19 @@ public final class HttpJsonResponder {
                     case '"' -> sb.append('"');
                     case '\\' -> sb.append('\\');
                     case '/' -> sb.append('/');
+                    case 'u' -> {
+                        if (i + 4 < s.length()) {
+                            try {
+                                String hex = s.substring(i + 1, i + 5);
+                                sb.append((char) Integer.parseInt(hex, 16));
+                                i += 4;
+                            } catch (NumberFormatException e) {
+                                sb.append("\\u");
+                            }
+                        } else {
+                            sb.append("\\u");
+                        }
+                    }
                     default -> sb.append(next);
                 }
             } else {

@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.api;
 
 import java.lang.reflect.Constructor;
@@ -10,9 +27,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Result of a dynamic compilation attempt with rich dynamic execution and invocation helpers.
+ * Result of a dynamic compilation attempt with rich dynamic execution,
+ * primitive widening, and invocation helpers.
  *
  * @param <T> The target interface or superclass type expected from the compiled class.
+ * @author Vivek Umrao
  */
 public class CompilationResult<T> {
 
@@ -101,7 +120,8 @@ public class CompilationResult<T> {
             if (isApplicable(ctor.getParameterTypes(), args)) {
                 try {
                     ctor.setAccessible(true);
-                    return (T) ctor.newInstance(args);
+                    Object[] actualArgs = convertArgs(ctor.getParameterTypes(), args);
+                    return (T) ctor.newInstance(actualArgs);
                 } catch (Exception e) {
                     throw new RuntimeException("Failed invoking constructor for " + compiledClass.getName(), e);
                 }
@@ -123,7 +143,8 @@ public class CompilationResult<T> {
         try {
             Constructor<? extends T> constructor = compiledClass.getDeclaredConstructor(paramTypes);
             constructor.setAccessible(true);
-            return constructor.newInstance(args);
+            Object[] actualArgs = convertArgs(paramTypes, args);
+            return constructor.newInstance(actualArgs);
         } catch (NoSuchMethodException e) {
             throw new IllegalArgumentException("Constructor not found for parameters on " + compiledClass.getName(), e);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
@@ -153,7 +174,8 @@ public class CompilationResult<T> {
         Method method = findMethod(methodName, false, args);
         try {
             method.setAccessible(true);
-            return method.invoke(target, args != null ? args : new Object[0]);
+            Object[] actualArgs = convertArgs(method.getParameterTypes(), args != null ? args : new Object[0]);
+            return method.invoke(target, actualArgs);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             throw new RuntimeException("Exception thrown while invoking method '" + methodName + "': " + cause.getMessage(), cause);
@@ -173,7 +195,8 @@ public class CompilationResult<T> {
         Method method = findMethod(methodName, true, args);
         try {
             method.setAccessible(true);
-            return method.invoke(null, args != null ? args : new Object[0]);
+            Object[] actualArgs = convertArgs(method.getParameterTypes(), args != null ? args : new Object[0]);
+            return method.invoke(null, actualArgs);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             throw new RuntimeException("Exception thrown while invoking static method '" + methodName + "': " + cause.getMessage(), cause);
@@ -231,13 +254,63 @@ public class CompilationResult<T> {
 
             if (paramType.isPrimitive()) {
                 Class<?> wrapper = PRIMITIVE_TO_WRAPPER.get(paramType);
-                if (wrapper == null || !wrapper.isInstance(arg)) {
-                    return false;
+                if (wrapper != null && wrapper.isInstance(arg)) {
+                    continue;
                 }
+                if (isWideningPrimitive(paramType, arg.getClass())) {
+                    continue;
+                }
+                return false;
             } else if (!paramType.isInstance(arg)) {
+                if (Number.class.isAssignableFrom(paramType) && arg instanceof Number) {
+                    continue;
+                }
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean isWideningPrimitive(Class<?> targetPrimitive, Class<?> argClass) {
+        if (targetPrimitive == double.class) {
+            return argClass == Float.class || argClass == Long.class || argClass == Integer.class || argClass == Short.class || argClass == Byte.class;
+        }
+        if (targetPrimitive == float.class) {
+            return argClass == Long.class || argClass == Integer.class || argClass == Short.class || argClass == Byte.class;
+        }
+        if (targetPrimitive == long.class) {
+            return argClass == Integer.class || argClass == Short.class || argClass == Byte.class;
+        }
+        if (targetPrimitive == int.class) {
+            return argClass == Short.class || argClass == Byte.class || argClass == Character.class;
+        }
+        if (targetPrimitive == short.class) {
+            return argClass == Byte.class;
+        }
+        return false;
+    }
+
+    private static Object[] convertArgs(Class<?>[] paramTypes, Object[] args) {
+        if (args == null || args.length == 0) return new Object[0];
+        Object[] converted = new Object[args.length];
+        for (int i = 0; i < args.length; i++) {
+            converted[i] = convertArg(paramTypes[i], args[i]);
+        }
+        return converted;
+    }
+
+    private static Object convertArg(Class<?> paramType, Object arg) {
+        if (arg == null) return null;
+        if (paramType.isPrimitive() || Number.class.isAssignableFrom(paramType)) {
+            if (arg instanceof Number num) {
+                if (paramType == int.class || paramType == Integer.class) return num.intValue();
+                if (paramType == long.class || paramType == Long.class) return num.longValue();
+                if (paramType == double.class || paramType == Double.class) return num.doubleValue();
+                if (paramType == float.class || paramType == Float.class) return num.floatValue();
+                if (paramType == short.class || paramType == Short.class) return num.shortValue();
+                if (paramType == byte.class || paramType == Byte.class) return num.byteValue();
+            }
+        }
+        return arg;
     }
 }

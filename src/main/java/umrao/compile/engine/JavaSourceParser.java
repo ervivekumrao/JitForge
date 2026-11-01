@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.engine;
 
 import java.util.regex.Matcher;
@@ -6,15 +23,17 @@ import java.util.regex.Pattern;
 /**
  * Robust utility to parse and extract package and class information from Java source code.
  * Strips comments, strings, and text blocks before analysis.
+ *
+ * @author Vivek Umrao
  */
 public final class JavaSourceParser {
 
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+([a-zA-Z0-9_.]+)\\s*;");
     private static final Pattern PUBLIC_TYPE_PATTERN = Pattern.compile(
-            "\\bpublic\\s+(?:final\\s+|abstract\\s+|sealed\\s+|non-sealed\\s+|static\\s+)*(class|interface|record|enum)\\s+([A-Za-z0-9_$]+)"
+            "\\bpublic\\s+(?:(?:final|abstract|sealed|non-sealed|static)\\s+|@[a-zA-Z0-9_.$]+(?:\\([^)]*\\))?\\s+)*(?<!@)\\b(class|interface|record|enum)\\s+([A-Za-z0-9_$]+)"
     );
     private static final Pattern ANY_TYPE_PATTERN = Pattern.compile(
-            "\\b(?:final\\s+|abstract\\s+|sealed\\s+|non-sealed\\s+|static\\s+)*(class|interface|record|enum)\\s+([A-Za-z0-9_$]+)"
+            "(?:(?:public|protected|private|final|abstract|sealed|non-sealed|static)\\s+|@[a-zA-Z0-9_.$]+(?:\\([^)]*\\))?\\s+)*(?<!@)\\b(class|interface|record|enum)\\s+([A-Za-z0-9_$]+)"
     );
 
     private JavaSourceParser() {
@@ -85,6 +104,7 @@ public final class JavaSourceParser {
     /**
      * Strips single-line comments, block comments, string literals, and text blocks
      * so keywords inside strings/comments are not mistaken for class/package declarations.
+     * Preserves whitespace separators so adjacent tokens are not concatenated.
      */
     public static String stripCommentsAndLiterals(String source) {
         StringBuilder sb = new StringBuilder(source.length());
@@ -103,6 +123,7 @@ public final class JavaSourceParser {
                 if (c == '*' && next == '/') {
                     inBlockComment = false;
                     i++;
+                    sb.append(' '); // Ensure token separation
                 }
                 continue;
             }
@@ -117,6 +138,7 @@ public final class JavaSourceParser {
                 if (c == '"' && next == '"' && i + 2 < len && source.charAt(i + 2) == '"') {
                     inTextBlock = false;
                     i += 2;
+                    sb.append(' ');
                 }
                 continue;
             }
@@ -125,6 +147,7 @@ public final class JavaSourceParser {
                     i++; // skip escaped character
                 } else if (c == '"') {
                     inString = false;
+                    sb.append(' ');
                 }
                 continue;
             }
@@ -133,6 +156,7 @@ public final class JavaSourceParser {
                     i++;
                 } else if (c == '\'') {
                     inChar = false;
+                    sb.append(' ');
                 }
                 continue;
             }

@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.store;
 
 import org.slf4j.Logger;
@@ -5,10 +22,15 @@ import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -16,9 +38,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Persists and resolves compiled class bytecodes in an in-memory distributed cache (Redis)
- * for sub-millisecond cluster-wide sharing across pods.
+ * for sub-millisecond cluster-wide sharing across pods with non-blocking SCAN support.
+ *
+ * @author Vivek Umrao
  */
-public class RedisBytecodeStore implements BytecodeStore {
+public class RedisBytecodeStore implements BytecodeStore, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(RedisBytecodeStore.class);
     private static final String DEFAULT_PREFIX = "runtime:bytecode:";
@@ -97,7 +121,7 @@ public class RedisBytecodeStore implements BytecodeStore {
             byte[] pkgKey = (keyPrefix + "pkg:" + pkg).getBytes(StandardCharsets.UTF_8);
             jedis.sadd(pkgKey, className.getBytes(StandardCharsets.UTF_8));
 
-            log.debug("Saved bytecode for {} to Redis (key={})", className, new String(classKey));
+            log.debug("Saved bytecode for {} to Redis (key={})", className, new String(classKey, StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.error("Failed saving bytecode to Redis for class {}", className, e);
             throw new RuntimeException("Redis error while saving " + className, e);
@@ -156,14 +180,31 @@ public class RedisBytecodeStore implements BytecodeStore {
 
         try (Jedis jedis = jedisPool.getResource()) {
             Map<String, byte[]> result = new HashMap<>();
-            byte[] pkgKey = (keyPrefix + "pkg:" + packageName).getBytes(StandardCharsets.UTF_8);
-            Set<byte[]> members = jedis.smembers(pkgKey);
-            if (members != null) {
-                for (byte[] m : members) {
-                    String className = new String(m, StandardCharsets.UTF_8);
-                    byte[] bytes = jedis.get((keyPrefix + "class:" + className).getBytes(StandardCharsets.UTF_8));
-                    if (bytes != null) {
-                        result.put(className, bytes);
+            Set<String> packageKeys = new HashSet<>();
+
+            if (recurse) {
+                String matchPattern = keyPrefix + "pkg:" + (packageName.isEmpty() ? "*" : packageName + "*");
+                ScanParams scanParams = new ScanParams().match(matchPattern).count(100);
+                String cursor = ScanParams.SCAN_POINTER_START;
+                do {
+                    ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+                    packageKeys.addAll(scanResult.getResult());
+                    cursor = scanResult.getCursor();
+                } while (!cursor.equals(ScanParams.SCAN_POINTER_START));
+            } else {
+                packageKeys.add(keyPrefix + "pkg:" + packageName);
+            }
+
+            for (String pkgKeyStr : packageKeys) {
+                byte[] pkgKey = pkgKeyStr.getBytes(StandardCharsets.UTF_8);
+                Set<byte[]> members = jedis.smembers(pkgKey);
+                if (members != null) {
+                    for (byte[] m : members) {
+                        String className = new String(m, StandardCharsets.UTF_8);
+                        byte[] bytes = jedis.get((keyPrefix + "class:" + className).getBytes(StandardCharsets.UTF_8));
+                        if (bytes != null) {
+                            result.put(className, bytes);
+                        }
                     }
                 }
             }
@@ -181,12 +222,32 @@ public class RedisBytecodeStore implements BytecodeStore {
             return;
         }
         try (Jedis jedis = jedisPool.getResource()) {
-            Set<String> keys = jedis.keys(keyPrefix + "*");
-            if (keys != null && !keys.isEmpty()) {
-                jedis.del(keys.toArray(new String[0]));
+            ScanParams scanParams = new ScanParams().match(keyPrefix + "*").count(100);
+            String cursor = ScanParams.SCAN_POINTER_START;
+            List<String> keysToDelete = new ArrayList<>();
+            do {
+                ScanResult<String> scanResult = jedis.scan(cursor, scanParams);
+                keysToDelete.addAll(scanResult.getResult());
+                if (keysToDelete.size() >= 100) {
+                    jedis.del(keysToDelete.toArray(new String[0]));
+                    keysToDelete.clear();
+                }
+                cursor = scanResult.getCursor();
+            } while (!cursor.equals(ScanParams.SCAN_POINTER_START));
+
+            if (!keysToDelete.isEmpty()) {
+                jedis.del(keysToDelete.toArray(new String[0]));
             }
         } catch (Exception e) {
             log.warn("Failed clearing Redis cache: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void close() {
+        if (jedisPool != null && !jedisPool.isClosed()) {
+            jedisPool.close();
+            log.info("Closed Redis connection pool.");
         }
     }
 }

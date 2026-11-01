@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.store;
 
 import org.slf4j.Logger;
@@ -16,7 +33,10 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Persists and resolves compiled class bytecodes directly on the local filesystem of the compiler pod.
+ * Persists and resolves compiled class bytecodes directly on the local filesystem of the compiler pod
+ * with strict path traversal boundary verification.
+ *
+ * @author Vivek Umrao
  */
 public class FileSystemBytecodeStore implements BytecodeStore {
 
@@ -24,7 +44,7 @@ public class FileSystemBytecodeStore implements BytecodeStore {
     private final Path rootDir;
 
     public FileSystemBytecodeStore(Path rootDir) {
-        this.rootDir = Objects.requireNonNull(rootDir, "rootDir must not be null");
+        this.rootDir = Objects.requireNonNull(rootDir, "rootDir must not be null").toAbsolutePath().normalize();
         try {
             Files.createDirectories(this.rootDir);
         } catch (IOException e) {
@@ -67,13 +87,13 @@ public class FileSystemBytecodeStore implements BytecodeStore {
         if (className == null) {
             return Optional.empty();
         }
-        Path targetFile = resolveClassFilePath(className);
-        if (Files.isRegularFile(targetFile)) {
-            try {
+        try {
+            Path targetFile = resolveClassFilePath(className);
+            if (Files.isRegularFile(targetFile)) {
                 return Optional.of(Files.readAllBytes(targetFile));
-            } catch (IOException e) {
-                log.warn("Failed reading bytecode from filesystem for class {}", className, e);
             }
+        } catch (Exception e) {
+            log.warn("Failed reading bytecode from filesystem for class {}: {}", className, e.getMessage());
         }
         return Optional.empty();
     }
@@ -83,12 +103,23 @@ public class FileSystemBytecodeStore implements BytecodeStore {
         if (className == null) {
             return false;
         }
-        return Files.isRegularFile(resolveClassFilePath(className));
+        try {
+            return Files.isRegularFile(resolveClassFilePath(className));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
     public Map<String, byte[]> loadPackage(String packageName, boolean recurse) {
-        Path packageDir = resolvePackageDirPath(packageName);
+        Path packageDir;
+        try {
+            packageDir = resolvePackageDirPath(packageName);
+        } catch (Exception e) {
+            log.warn("Invalid package path for {}: {}", packageName, e.getMessage());
+            return Collections.emptyMap();
+        }
+
         if (!Files.isDirectory(packageDir)) {
             return Collections.emptyMap();
         }
@@ -133,13 +164,21 @@ public class FileSystemBytecodeStore implements BytecodeStore {
 
     private Path resolveClassFilePath(String className) {
         String relative = className.replace('.', File.separatorChar) + ".class";
-        return rootDir.resolve(relative);
+        Path target = rootDir.resolve(relative).normalize();
+        if (!target.startsWith(rootDir)) {
+            throw new SecurityException("Path traversal attempt detected in class name: " + className);
+        }
+        return target;
     }
 
     private Path resolvePackageDirPath(String packageName) {
         if (packageName == null || packageName.isBlank()) {
             return rootDir;
         }
-        return rootDir.resolve(packageName.replace('.', File.separatorChar));
+        Path target = rootDir.resolve(packageName.replace('.', File.separatorChar)).normalize();
+        if (!target.startsWith(rootDir)) {
+            throw new SecurityException("Path traversal attempt detected in package name: " + packageName);
+        }
+        return target;
     }
 }

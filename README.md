@@ -1,4 +1,8 @@
-# RuntimeCompile
+# JitForge
+
+> **Enterprise In-Memory Java Runtime Compilation, JIT Execution & Tiered Bytecode Microservice**  
+> **Author & Developer:** Vivek Umrao  
+> **License:** [Apache License 2.0](LICENSE)
 
 A high-performance, in-memory Java runtime compilation, JIT execution, and bytecode synthesis engine. It enables
 compiling and executing dynamic Java code, scripts, and expressions entirely in RAM with zero disk I/O, sub-millisecond
@@ -60,7 +64,7 @@ caching, robust multi-tier dependency resolution, containerized microservices, a
 
 ## 🦭 Running as a Service in Podman Containers
 
-`RuntimeCompile` runs as a containerized REST microservice orchestrated alongside Redis and PostgreSQL containers using
+`JitForge` runs as a containerized REST microservice orchestrated alongside Redis and PostgreSQL containers using
 Podman.
 
 ```mermaid
@@ -755,7 +759,7 @@ CompilationResult<Object> fromFile = compiler.compile(new File("src/models/User.
 
 ### 7. Accessing Class and Bytecode in Local JVM
 
-When using `RuntimeCompile` as an embedded library, you have direct programmatic access to the loaded `Class<?>` and the
+When using `JitForge` as an embedded library, you have direct programmatic access to the loaded `Class<?>` and the
 raw `byte[]` bytecode:
 
 ```java
@@ -832,7 +836,7 @@ The project uses the **SLF4J 2.x** facade with **Logback Classic**.
 ## 🏗️ Project Structure
 
 ```
-RuntimeCompile/
+JitForge/
 ├── deploy/
 │   ├── containers/
 │   │   ├── Dockerfile                # Multi-stage production container specification (Docker & Podman)

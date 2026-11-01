@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.service.config;
 
 import java.io.File;
@@ -7,6 +24,8 @@ import java.nio.file.Paths;
 /**
  * 12-Factor App configuration model for CompilerHttpService.
  * Reads configurations dynamically from environment variables, system properties, or programmatic builder.
+ *
+ * @author Vivek Umrao
  */
 public record CompilerServiceConfig(
         int port,
@@ -16,7 +35,8 @@ public record CompilerServiceConfig(
         String redisPassword,
         String dbUrl,
         String dbUser,
-        String dbPassword
+        String dbPassword,
+        boolean sandboxEnabled
 ) {
 
     public static final int DEFAULT_PORT = 8080;
@@ -39,6 +59,7 @@ public record CompilerServiceConfig(
         String dbUrl = getEnvString("DB_URL", null);
         String dbUser = getEnvString("DB_USER", null);
         String dbPassword = getEnvString("DB_PASSWORD", null);
+        boolean sandboxEnabled = !"false".equalsIgnoreCase(getEnvString("SECURITY_SANDBOX_ENABLED", "true"));
 
         return new CompilerServiceConfig(
                 port,
@@ -48,7 +69,8 @@ public record CompilerServiceConfig(
                 redisPassword,
                 dbUrl,
                 dbUser,
-                dbPassword
+                dbPassword,
+                sandboxEnabled
         );
     }
 
@@ -84,6 +106,7 @@ public record CompilerServiceConfig(
         private String dbUrl;
         private String dbUser;
         private String dbPassword;
+        private boolean sandboxEnabled = true;
 
         public Builder port(int port) {
             this.port = port;
@@ -113,9 +136,14 @@ public record CompilerServiceConfig(
             return this;
         }
 
+        public Builder sandboxEnabled(boolean enabled) {
+            this.sandboxEnabled = enabled;
+            return this;
+        }
+
         public CompilerServiceConfig build() {
             return new CompilerServiceConfig(
-                    port, storageDir, redisHost, redisPort, redisPassword, dbUrl, dbUser, dbPassword
+                    port, storageDir, redisHost, redisPort, redisPassword, dbUrl, dbUser, dbPassword, sandboxEnabled
             );
         }
     }

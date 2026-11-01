@@ -1,8 +1,30 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import umrao.compile.jit.*;
+import umrao.compile.jit.ByteBuddyRuntimeGenerator;
+import umrao.compile.jit.GroovyJitCompiler;
+import umrao.compile.jit.JaninoJitCompiler;
+import umrao.compile.jit.JavassistRuntimeCompiler;
+import umrao.compile.jit.JitEngineType;
+import umrao.compile.jit.MvelJitEngine;
 import umrao.std.Message;
 
 import java.io.Serializable;
@@ -32,7 +54,10 @@ class JitFrameworksTest {
         String code = """
                 package umrao.generated;
                 import umrao.std.Message;
-                public class JaninoTest implements Message {
+                /**
+ * @author Vivek Umrao
+ */
+public class JaninoTest implements Message {
                     public void showMessage() {}
                 }
                 """;

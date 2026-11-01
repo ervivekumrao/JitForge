@@ -1,3 +1,20 @@
+/*
+ * JitForge - Enterprise Runtime Bytecode & JIT Compilation Engine
+ *
+ * Copyright (c) 2024-2026 Vivek Umrao
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package umrao.compile.store;
 
 import org.h2.jdbcx.JdbcDataSource;
@@ -23,7 +40,9 @@ import java.util.Optional;
 
 /**
  * Persists and resolves compiled class bytecodes in an external SQL database
- * (e.g. PostgreSQL, MySQL, MariaDB, Oracle, H2) running in a separate container/pod.
+ * (e.g. PostgreSQL, MySQL, MariaDB, Oracle, H2) with concurrency-safe upserts.
+ *
+ * @author Vivek Umrao
  */
 @SuppressWarnings({"SqlNoDataSourceInspection", "SqlDialectInspection"})
 public class DatabaseBytecodeStore implements BytecodeStore {
@@ -60,7 +79,6 @@ public class DatabaseBytecodeStore implements BytecodeStore {
             if (password != null) ds.setPassword(password);
             return ds;
         } else {
-            // Generic fallback using standard DriverManager
             return new GenericDriverManagerDataSource(jdbcUrl, user, password);
         }
     }
@@ -129,6 +147,15 @@ public class DatabaseBytecodeStore implements BytecodeStore {
                         insertStmt.setBytes(3, bytecode);
                         insertStmt.setTimestamp(4, now);
                         insertStmt.executeUpdate();
+                    } catch (SQLException dupEx) {
+                        // Concurrency race: another thread inserted between update and insert
+                        try (PreparedStatement updateRetry = conn.prepareStatement(updateSql)) {
+                            updateRetry.setString(1, packageName);
+                            updateRetry.setBytes(2, bytecode);
+                            updateRetry.setTimestamp(3, now);
+                            updateRetry.setString(4, className);
+                            updateRetry.executeUpdate();
+                        }
                     }
                 }
                 conn.commit();
@@ -190,18 +217,23 @@ public class DatabaseBytecodeStore implements BytecodeStore {
     public Map<String, byte[]> loadPackage(String packageName, boolean recurse) {
         String sql;
         String param;
+        String escaped = (packageName != null ? packageName : "")
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+
         if (recurse) {
-            sql = "SELECT class_name, bytecode FROM compiled_classes WHERE package_name = ? OR package_name LIKE ?";
-            param = packageName.isEmpty() ? "%" : packageName + ".%";
+            sql = "SELECT class_name, bytecode FROM compiled_classes WHERE package_name = ? OR package_name LIKE ? ESCAPE '!'";
+            param = packageName == null || packageName.isEmpty() ? "%" : escaped + ".%";
         } else {
             sql = "SELECT class_name, bytecode FROM compiled_classes WHERE package_name = ?";
-            param = packageName;
+            param = packageName != null ? packageName : "";
         }
 
         Map<String, byte[]> result = new HashMap<>();
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, packageName);
+            stmt.setString(1, packageName != null ? packageName : "");
             if (recurse) {
                 stmt.setString(2, param);
             }

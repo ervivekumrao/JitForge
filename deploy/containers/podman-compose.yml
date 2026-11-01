@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: docker.io/library/postgres:15
-    container_name: compiler-postgres
+    container_name: jitforge-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: bytecode_db
@@ -21,7 +21,7 @@ services:
 
   redis:
     image: docker.io/library/redis:7.2-alpine
-    container_name: compiler-redis
+    container_name: jitforge-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -33,12 +33,12 @@ services:
       timeout: 3s
       retries: 5
 
-  compiler-service:
-    image: localhost/runtime-compile:latest
+  jitforge-service:
+    image: localhost/jitforge:latest
     build:
       context: ../..
       dockerfile: deploy/containers/Dockerfile
-    container_name: runtime-compiler-service
+    container_name: jitforge-service
     restart: unless-stopped
     depends_on:
       - redis
@@ -46,6 +46,7 @@ services:
     environment:
       SERVER_PORT: 8080
       COMPILER_SERVICE: "true"
+      SECURITY_SANDBOX_ENABLED: "true"
       STORAGE_DIR: /var/data/compiler/classes
       REDIS_HOST: redis
       REDIS_PORT: 6379
